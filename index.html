@@ -42,6 +42,7 @@
             width: 100%; padding: 12px; margin: 8px 0; border-radius: 12px; border: 1px solid rgba(255,255,255,0.3); background: rgba(0,0,0,0.5); color: white; font-size: 1rem; text-align: center;
         }
 
+        .file-label { display: block; background: rgba(255,255,255,0.1); padding: 10px; border-radius: 10px; margin: 8px 0; cursor: pointer; border: 1px dashed var(--secondary); font-size: 0.9rem; }
         .error-msg { color: #ff4d4d; font-weight: bold; margin-top: 10px; }
 
         /* المشهد السينمائي */
@@ -97,19 +98,29 @@
 
     <div class="container">
 
-        <!-- 0. مولد الرابط السريع والآمن -->
+        <!-- 0. صفحة الإعدادات والرفع من التليفون -->
         <div id="generatorCard" class="card">
-            <h2>✨ صانع المفاجآت السريع ✨</h2>
-            <p style="margin-bottom: 10px; font-size: 0.85rem;">ضع روابط الصور (بينها فواصل) ورابط الأغنية لتوليد رابطك الخاص فوراً:</p>
+            <h2>✨ صانع المفاجآت الذكي ✨</h2>
+            <p style="margin-bottom: 10px; font-size: 0.85rem;">ارفع صورك وأغنيتك من الموبايل مباشرة:</p>
             <input type="text" id="cfgPass" placeholder="كلمة السر الخاصة بها">
             <input type="text" id="cfgDate" placeholder="تاريخ ارتباطنا (مثال: 2024/05/12)">
             <textarea id="cfgMsg1" rows="2" placeholder="الرسالة الأولى"></textarea>
             <textarea id="cfgMsg2" rows="3" placeholder="الرسالة الكبرى الأخيرة"></textarea>
             
-            <input type="text" id="cfgImages" placeholder="روابط الصور مفصولة بـ , (مثال: رابط1, رابط2)">
-            <input type="text" id="cfgMusic" placeholder="رابط الأغنية المباشر (MP3)">
+            <label class="file-label">
+                📁 اختر الصور من التليفون (من 1 إلى 3 صور):
+                <input type="file" id="cfgImagesFile" multiple accept="image/*" style="display:none;" onchange="handleImagesSelect(this)">
+            </label>
+            <div id="imagesCountStatus" style="font-size: 0.8rem; color: #ff758f; margin-bottom: 5px;">تم اختيار 0 صورة</div>
 
-            <button class="btn" onclick="generatePerfectLink()">توليد الرابط الخاص 🚀</button>
+            <label class="file-label">
+                🎵 اختر أغنية من التليفون (MP3):
+                <input type="file" id="cfgMusicFile" accept="audio/*" style="display:none;" onchange="handleMusicSelect(this)">
+            </label>
+            <div id="musicStatus" style="font-size: 0.8rem; color: #ff758f; margin-bottom: 10px;">لم يتم اختيار أغنية</div>
+
+            <button id="genBtn" class="btn" onclick="generateLinkFromDevice()">توليد الرابط الخاص 🚀</button>
+            <div id="loadingStatus" style="margin-top: 10px; color: #ff758f; font-weight: bold;"></div>
             <div id="linkResult" style="margin-top: 15px; word-break: break-all;"></div>
         </div>
 
@@ -124,10 +135,11 @@
             <div id="errorArea" class="error-msg hidden">الباسورد غلط يا حبيبتي ركزي ❤️</div>
         </div>
 
-        <!-- 2. المشهد السينمائي -->
+        <!-- 2. المشهد السينمائي المطور -->
         <div id="stepCinematic" class="card hidden" style="position: relative; overflow: hidden;">
             <canvas id="matrixCanvas"></canvas>
             <div class="cinematic-scene">
+                <!-- قلب I Love You -->
                 <div id="heartShapeContainer" class="heart-grid">
                     <div></div><div>I Love You</div><div>❤️</div><div>I Love You</div><div></div>
                     <div>I Love You</div><div>I Love You</div><div>I Love You</div><div>I Love You</div><div>I Love You</div>
@@ -136,6 +148,7 @@
                     <div></div><div></div><div>I Love You</div><div></div><div></div>
                 </div>
 
+                <!-- رسمة الحضن والعبارة -->
                 <div id="hugContainer" class="hug-art-container">
                     <div class="forever-text">I will love you forever</div>
                     <svg class="hug-svg" viewBox="0 0 100 100">
@@ -196,6 +209,9 @@
             music: ""
         };
 
+        let tempImages = [];
+        let tempMusic = "";
+
         window.onload = function() {
             parseURLData();
         };
@@ -215,34 +231,92 @@
             }
         }
 
-        function generatePerfectLink() {
-            const imgInput = document.getElementById('cfgImages').value.trim();
-            const imgList = imgInput ? imgInput.split(',').map(s => s.trim()).filter(s => s) : [];
+        // ضغط الصور تلقائياً لتناسب مساحة الرابط
+        function handleImagesSelect(input) {
+            const files = Array.from(input.files).slice(0, 3);
+            tempImages = [];
+            let loaded = 0;
 
-            const data = {
-                pass: document.getElementById('cfgPass').value.trim() || "123",
-                date: document.getElementById('cfgDate').value.trim() || "تاريخ ارتباطنا",
-                msg1: document.getElementById('cfgMsg1').value.trim() || "بحبك جداً يا روحي",
-                msg2: document.getElementById('cfgMsg2').value.trim() || "أنتي كل حاجة في حياتي",
-                images: imgList,
-                music: document.getElementById('cfgMusic').value.trim() || ""
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    compressImage(e.target.result, 250, 0.4, (compressed) => {
+                        tempImages.push(compressed);
+                        loaded++;
+                        document.getElementById('imagesCountStatus').innerText = `تم تجهيز ${loaded} صورة بنجاح ✅`;
+                    });
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function compressImage(base64Str, maxWidth, quality, callback) {
+            const img = new Image();
+            img.src = base64Str;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                callback(canvas.toDataURL('image/jpeg', quality));
             };
+        }
 
-            const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
-            const fullURL = window.location.origin + window.location.pathname + '#' + encoded;
+        function handleMusicSelect(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    tempMusic = e.target.result;
+                    document.getElementById('musicStatus').innerText = "تم قراءة وتجهيز الأغنية بنجاح 🎵";
+                };
+                reader.readAsDataURL(file);
+            }
+        }
 
-            document.getElementById('linkResult').innerHTML = `
-                <p style="color: #4cd137; font-weight: bold; margin-bottom: 8px;">تم توليد الرابط بنجاح صاروخي! 🎉</p>
-                <input type="text" value="${fullURL}" readonly id="finalUrlInput" onclick="this.select()">
-                <button class="btn" style="padding: 8px 18px; font-size: 0.9rem;" onclick="copyLink()">نسخ الرابط 📋</button>
-            `;
+        function generateLinkFromDevice() {
+            const status = document.getElementById('loadingStatus');
+            status.innerText = "جاري ضغط الملفات وتوليد الرابط الخاص... ⏳";
+
+            setTimeout(() => {
+                const data = {
+                    pass: document.getElementById('cfgPass').value.trim() || "123",
+                    date: document.getElementById('cfgDate').value.trim() || "تاريخ ارتباطنا",
+                    msg1: document.getElementById('cfgMsg1').value.trim() || "بحبك جداً يا روحي",
+                    msg2: document.getElementById('cfgMsg2').value.trim() || "أنتي كل حاجة في حياتي",
+                    images: tempImages,
+                    music: tempMusic
+                };
+
+                try {
+                    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+                    const fullURL = window.location.origin + window.location.pathname + '#' + encoded;
+
+                    status.innerText = "";
+                    document.getElementById('linkResult').innerHTML = `
+                        <p style="color: #4cd137; font-weight: bold; margin-bottom: 8px;">تم توليد الرابط الخاص بنجاح صاروخي! 🎉</p>
+                        <input type="text" value="${fullURL}" readonly id="finalUrlInput" onclick="this.select()">
+                        <button class="btn" style="padding: 8px 18px; font-size: 0.9rem;" onclick="copyLink()">نسخ الرابط 📋</button>
+                    `;
+                } catch(e) {
+                    status.innerText = "";
+                    alert("الملفات ثقيلة بعض الشيء، يرجى اختيار صور أقل (صورتين مثلاً) أو مقطع صوتي أقصر لتوليد الرابط فوراً.");
+                }
+            }, 300);
         }
 
         function copyLink() {
             const copyText = document.getElementById("finalUrlInput");
             copyText.select();
             document.execCommand("copy");
-            alert("تم نسخ الرابط! ابعتهولها وافتحوا الاحتفال ❤️");
+            alert("تم نسخ الرابط! ابعتهولها دلوقتي ❤️");
         }
 
         function showOnly(id) {
@@ -255,7 +329,7 @@
             if (val === packageData.pass) {
                 document.getElementById('errorArea').classList.add('hidden');
                 
-                // تشغيل الأغنية فور إدخال الباسورد الصح
+                // تشغيل الأغنية المرفوعة أوتوماتيكياً فور إدخال كلمة السر
                 if (packageData.music) {
                     const audio = document.getElementById('bgMusic');
                     audio.src = packageData.music;
@@ -294,12 +368,13 @@
                 }
             }, 50);
 
-            // 7 ثوانٍ أكواد
+            // 7 ثوانٍ أكواد Matrix
             setTimeout(() => {
                 clearInterval(matrixInterval);
                 canvas.style.display = 'none';
                 document.getElementById('heartShapeContainer').classList.add('show');
 
+                // ظهور رسمة الحضن والعبارة
                 setTimeout(() => {
                     document.getElementById('hugContainer').classList.add('show');
                     document.getElementById('btnAfterCinematic').classList.remove('hidden');
@@ -342,46 +417,4 @@
             document.getElementById('displayDate').innerText = "تاريخ ارتباطنا: " + (packageData.date || "أجمل تاريخ");
             const container = document.getElementById('albumContainer');
             container.innerHTML = "";
-            let imgs = packageData.images && packageData.images.length > 0 ? packageData.images : ["https://picsum.photos/300/400"];
-
-            imgs.forEach((url, idx) => {
-                let card = document.createElement('div');
-                card.className = 'album-card';
-                card.style.zIndex = imgs.length - idx;
-                card.innerHTML = `<img src="${url}">`;
-                card.onclick = function() {
-                    this.style.transform = 'translateX(-150%) rotate(-20deg)';
-                    this.style.opacity = '0';
-                    setTimeout(() => { container.appendChild(this); this.style.transform = ''; this.style.opacity = '1'; }, 600);
-                };
-                container.appendChild(card);
-            });
-        }
-
-        function startFinalShowcase() {
-            showOnly('stepFinalShowcase');
-            const showcase = document.getElementById('stackShowcase');
-            showcase.innerHTML = "";
-            let imgs = packageData.images && packageData.images.length > 0 ? packageData.images : ["https://picsum.photos/300/400"];
-
-            imgs.forEach((url) => {
-                let img = document.createElement('img');
-                img.src = url;
-                img.className = 'stack-img';
-                showcase.appendChild(img);
-            });
-
-            const stackImages = document.querySelectorAll('.stack-img');
-            let current = 0;
-            function showNextImage() {
-                if(current < stackImages.length) {
-                    stackImages[current].classList.add('active');
-                    current++;
-                    setTimeout(showNextImage, 2500);
-                }
-            }
-            showNextImage();
-        }
-    </script>
-</body>
-</html>
+            let imgs = packageData.images && packageData.imag
