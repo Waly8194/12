@@ -98,10 +98,10 @@
 
     <div class="container">
 
-        <!-- 0. مولد البيانات مع السيرفر السحابي (ImgBB API) -->
+        <!-- 0. صفحة إعداد المفاجأة والرفع من التليفون -->
         <div id="generatorCard" class="card">
             <h2>✨ صانع المفاجآت الذكي ✨</h2>
-            <p style="margin-bottom: 10px; font-size: 0.85rem;">اختر لحد 12 صورة والأغنية من الموبايل لتوليد رابطك الخاص:</p>
+            <p style="margin-bottom: 10px; font-size: 0.85rem;">اختر لحد 12 صورة والأغنية من تليفونك، واحفظ المفاجأة:</p>
             <input type="text" id="cfgPass" placeholder="كلمة السر الخاصة بها">
             <input type="text" id="cfgDate" placeholder="تاريخ ارتباطنا (مثال: 2024/05/12)">
             <textarea id="cfgMsg1" rows="2" placeholder="الرسالة الأولى"></textarea>
@@ -114,14 +114,17 @@
             <div id="imagesCountStatus" style="font-size: 0.8rem; color: #ff758f; margin-bottom: 5px;">تم اختيار 0 صورة</div>
 
             <label class="file-label">
-                🎵 اختر ملف الأغنية (MP3) أو ضعي رابط مباشر لها:
+                🎵 اختر ملف الأغنية (MP3) من الموبايل:
                 <input type="file" id="cfgMusicFile" accept="audio/*" style="display:none;" onchange="handleMusicSelect(this)">
             </label>
             <div id="musicStatus" style="font-size: 0.8rem; color: #ff758f; margin-bottom: 10px;">لم يتم اختيار أغنية</div>
 
-            <button id="genBtn" class="btn" onclick="generateStableCloudLink()">رفع الملفات وتوليد الرابط الخاص 🚀</button>
-            <div id="loadingStatus" style="margin-top: 10px; color: #ff758f; font-weight: bold;"></div>
-            <div id="linkResult" style="margin-top: 15px; word-break: break-all;"></div>
+            <button class="btn" onclick="saveAndStart()">حفظ وحفظ الرابط 🚀</button>
+            <div id="linkOutput" style="margin-top: 15px; display: none;">
+                <p style="color: #4cd137; font-weight: bold; margin-bottom: 5px;">تم الحفظ بنجاح! الرابط الأساسي للموقع:</p>
+                <input type="text" readonly id="siteUrlInput" onclick="this.select()">
+                <button class="btn" style="padding: 8px 18px; font-size: 0.9rem;" onclick="copySiteUrl()">نسخ الرابط 📋</button>
+            </div>
         </div>
 
         <!-- 1. شاشة الباسورد -->
@@ -133,9 +136,11 @@
                 <button class="btn" onclick="checkPassword()">دخول ❤️</button>
             </div>
             <div id="errorArea" class="error-msg hidden">الباسورد غلط يا حبيبتي ركزي ❤️</div>
+            <br>
+            <button style="background:none; border:none; color:#aaa; font-size:0.8rem; cursor:pointer;" onclick="resetSettings()">⚙️ تعديل الإعدادات</button>
         </div>
 
-        <!-- 2. المشهد السينمائي -->
+        <!-- 2. المشهد السينمائي المطور -->
         <div id="stepCinematic" class="card hidden" style="position: relative; overflow: hidden;">
             <canvas id="matrixCanvas"></canvas>
             <div class="cinematic-scene">
@@ -200,8 +205,6 @@
     </div>
 
     <script>
-        const IMGBB_API_KEY = "6d702662054630070ea1129d92597fac"; // مفتاح الرفع المباشر
-
         let packageData = {
             pass: "123",
             date: "",
@@ -211,117 +214,93 @@
             music: ""
         };
 
-        let selectedImageFiles = [];
-        let selectedMusicFile = null;
+        let tempImages = [];
+        let tempMusic = "";
 
         window.onload = function() {
-            parseURLData();
+            const saved = localStorage.getItem('romance_package_v2');
+            if (saved) {
+                try {
+                    packageData = JSON.parse(saved);
+                    showOnly('stepPassword');
+                    return;
+                } catch(e) {}
+            }
+            showOnly('generatorCard');
         };
 
-        function parseURLData() {
-            const hash = window.location.hash.substring(1);
-            if (hash) {
-                try {
-                    const decoded = JSON.parse(decodeURIComponent(escape(atob(hash))));
-                    packageData = decoded;
-                    showOnly('stepPassword');
-                } catch(e) {
-                    showOnly('generatorCard');
-                }
-            } else {
-                showOnly('generatorCard');
-            }
+        function handleImagesSelect(input) {
+            const files = Array.from(input.files).slice(0, 12);
+            tempImages = [];
+            let loaded = 0;
+
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    compressImg(e.target.result, 450, 0.6, function(compressed) {
+                        tempImages.push(compressed);
+                        loaded++;
+                        document.getElementById('imagesCountStatus').innerText = `تم تجهيز ${loaded} صورة بنجاح ✅`;
+                    });
+                };
+                reader.readAsDataURL(file);
+            });
         }
 
-        function handleImagesSelect(input) {
-            selectedImageFiles = Array.from(input.files).slice(0, 12); // حصر لحد 12 صورة
-            document.getElementById('imagesCountStatus').innerText = `تم اختيار ${selectedImageFiles.length} صورة بنجاح ✅`;
+        function compressImg(base64, maxW, qual, cb) {
+            const img = new Image();
+            img.src = base64;
+            img.onload = () => {
+                const cvs = document.createElement('canvas');
+                let w = img.width, h = img.height;
+                if (w > maxW) { h = Math.round((h * maxW) / w); w = maxW; }
+                cvs.width = w; cvs.height = h;
+                const ctx = cvs.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                cb(cvs.toDataURL('image/jpeg', qual));
+            };
         }
 
         function handleMusicSelect(input) {
-            selectedMusicFile = input.files[0];
-            if (selectedMusicFile) {
-                document.getElementById('musicStatus').innerText = "تم اختيار الأغنية بنجاح 🎵";
-            }
-        }
-
-        // دالة الرفع السحابي للصور فورياً لـ ImgBB
-        async function uploadImageToImgBB(file) {
-            const formData = new FormData();
-            formData.append('image', file);
-
-            try {
-                const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await res.json();
-                if (data && data.data && data.data.url) {
-                    return data.data.url;
-                }
-            } catch(e) {}
-            return null;
-        }
-
-        async function generateStableCloudLink() {
-            const btn = document.getElementById('genBtn');
-            const status = document.getElementById('loadingStatus');
-
-            if(selectedImageFiles.length === 0) {
-                alert("يرجى اختيار صورك من الموبايل أولاً.");
-                return;
-            }
-
-            btn.disabled = true;
-            status.innerText = "جاري رفع الـ 12 صورة إلى السيرفر... ⏳";
-
-            let uploadedImages = [];
-            for (let i = 0; i < selectedImageFiles.length; i++) {
-                status.innerText = `جاري رفع الصورة (${i+1}/${selectedImageFiles.length})... ⏳`;
-                let imgUrl = await uploadImageToImgBB(selectedImageFiles[i]);
-                if (imgUrl) uploadedImages.push(imgUrl);
-            }
-
-            let uploadedMusic = "";
-            if (selectedMusicFile) {
-                status.innerText = "جاري معالجة ملف الأغنية... 🎵";
-                // قراءة ملف الصوت بتنسيق خفيف جداً
+            const file = input.files[0];
+            if (file) {
                 const reader = new FileReader();
-                uploadedMusic = await new Promise((resolve) => {
-                    reader.onload = (e) => resolve(e.target.result);
-                    reader.readAsDataURL(selectedMusicFile);
-                });
+                reader.onload = function(e) {
+                    tempMusic = e.target.result;
+                    document.getElementById('musicStatus').innerText = "تم قراءة وتجهيز الأغنية بنجاح 🎵";
+                };
+                reader.readAsDataURL(file);
             }
+        }
 
-            status.innerText = "جاري إنشاء وتوليد الرابط الخاص... 🚀";
-
-            const data = {
+        function saveAndStart() {
+            packageData = {
                 pass: document.getElementById('cfgPass').value.trim() || "123",
                 date: document.getElementById('cfgDate').value.trim() || "تاريخ ارتباطنا",
                 msg1: document.getElementById('cfgMsg1').value.trim() || "بحبك جداً يا روحي",
                 msg2: document.getElementById('cfgMsg2').value.trim() || "أنتي كل حاجة في حياتي",
-                images: uploadedImages,
-                music: uploadedMusic
+                images: tempImages.length > 0 ? tempImages : ["https://picsum.photos/300/400"],
+                music: tempMusic
             };
 
-            const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
-            const fullURL = window.location.origin + window.location.pathname + '#' + encoded;
+            // حفظ البيانات بالكامل في ذاكرة متصفحك
+            localStorage.setItem('romance_package_v2', JSON.stringify(packageData));
 
-            status.innerText = "";
-            btn.disabled = false;
-
-            document.getElementById('linkResult').innerHTML = `
-                <p style="color: #4cd137; font-weight: bold; margin-bottom: 8px;">تم توليد الرابط الـ 12 صورة بنجاح! 🎉</p>
-                <input type="text" value="${fullURL}" readonly id="finalUrlInput" onclick="this.select()">
-                <button class="btn" style="padding: 8px 18px; font-size: 0.9rem;" onclick="copyLink()">نسخ الرابط 📋</button>
-            `;
+            const fullURL = window.location.origin + window.location.pathname;
+            document.getElementById('siteUrlInput').value = fullURL;
+            document.getElementById('linkOutput').style.display = 'block';
         }
 
-        function copyLink() {
-            const copyText = document.getElementById("finalUrlInput");
+        function copySiteUrl() {
+            const copyText = document.getElementById("siteUrlInput");
             copyText.select();
             document.execCommand("copy");
-            alert("تم نسخ الرابط! ابعتهولها دلوقتي على الواتساب ❤️");
+            alert("تم نسخ الرابط الأساسي! ابعتهولها دلوقتي على الواتساب ❤️");
+        }
+
+        function resetSettings() {
+            localStorage.removeItem('romance_package_v2');
+            showOnly('generatorCard');
         }
 
         function showOnly(id) {
@@ -334,7 +313,7 @@
             if (val === packageData.pass) {
                 document.getElementById('errorArea').classList.add('hidden');
                 
-                // تشغيل الأغنية المرفوعة أوتوماتيكياً فور إدخال كلمة السر
+                // تشغيل الأغنية المرفوعة أوتوماتيكياً فور إدخال الباسورد الصح
                 if (packageData.music) {
                     const audio = document.getElementById('bgMusic');
                     audio.src = packageData.music;
@@ -344,6 +323,7 @@
                 showOnly('stepCinematic');
                 startCinematicSequence();
             } else {
+                document.getElementById('errorArea').classList.add('hidden'); // Fix error area logic
                 document.getElementById('errorArea').classList.remove('hidden');
             }
         }
@@ -420,4 +400,16 @@
 
         function setupAlbum() {
             document.getElementById('displayDate').innerText = "تاريخ ارتباطنا: " + (packageData.date || "أجمل تاريخ");
-            const container
+            const container = document.getElementById('albumContainer');
+            container.innerHTML = "";
+            let imgs = packageData.images && packageData.images.length > 0 ? packageData.images : ["https://picsum.photos/300/400"];
+
+            imgs.forEach((url, idx) => {
+                let card = document.createElement('div');
+                card.className = 'album-card';
+                card.style.zIndex = imgs.length - idx;
+                card.innerHTML = `<img src="${url}">`;
+                card.onclick = function() {
+                    this.style.transform = 'translateX(-150%) rotate(-20deg)';
+                    this.style.opacity = '0';
+                    setTimeout(() => { cont
